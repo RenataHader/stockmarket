@@ -53,13 +53,33 @@ public class StockService {
             if walletQty == nil or walletQty <= 0 then
               return redis.error_reply('NO_STOCK_IN_WALLET')
             end
-            redis.call('DECRBY', walletKey, 1)
+            local newQty = tonumber(redis.call('DECRBY', walletKey, 1))
+            if newQty <= 0 then
+              redis.call('SREM', walletSet, stockName)
+              redis.call('DEL', walletKey)
+            end
             redis.call('INCR', bankKey)
             redis.call('SADD', bankSet, stockName)
-            redis.call('SADD', walletSet, stockName)
             return 'OK'
             """;
 
+    private static final String SET_BANK_SCRIPT = """
+            local bankSet = KEYS[1]
+            local oldNames = redis.call('SMEMBERS', bankSet)
+            for _, name in ipairs(oldNames) do
+              redis.call('DEL', 'bank:' .. name)
+            end
+            redis.call('DEL', bankSet)
+            for i = 1, #ARGV, 2 do
+              local name = ARGV[i]
+              local qty  = ARGV[i + 1]
+              redis.call('SET', 'bank:' .. name, qty)
+              redis.call('SADD', bankSet, name)
+            end
+            return 'OK'
+            """;
+
+    private final DefaultRedisScript<String> setBankScript;
     private final DefaultRedisScript<String> buyScript;
     private final DefaultRedisScript<String> sellScript;
 
@@ -73,6 +93,10 @@ public class StockService {
         sellScript = new DefaultRedisScript<>();
         sellScript.setScriptText(SELL_SCRIPT);
         sellScript.setResultType(String.class);
+
+        setBankScript = new DefaultRedisScript<>();
+        setBankScript.setScriptText(SET_BANK_SCRIPT);
+        setBankScript.setResultType(String.class);
     }
 
     public List<StockEntry> getBankStocks() {
@@ -85,21 +109,12 @@ public class StockService {
     }
 
     public void setBankStocks(List<StockEntry> stocks) {
-        Set<String> oldNames = redis.opsForSet().members(BANK_STOCKS_SET);
-
-        if (oldNames != null) {
-            for (String oldName : oldNames) {
-                redis.delete(BANK_PREFIX + oldName);
-            }
-        }
-
-        redis.delete(BANK_STOCKS_SET);
-
+        List<String> argv = new ArrayList<>();
         for (StockEntry entry : stocks) {
-            String key = BANK_PREFIX + entry.name();
-            redis.opsForValue().set(key, String.valueOf(entry.quantity()));
-            redis.opsForSet().add(BANK_STOCKS_SET, entry.name());
+            argv.add(entry.name());
+            argv.add(String.valueOf(entry.quantity()));
         }
+        redis.execute(setBankScript, List.of(BANK_STOCKS_SET), argv.toArray(new String[0]));
     }
 
     private long getBankQuantity(String stockName) {

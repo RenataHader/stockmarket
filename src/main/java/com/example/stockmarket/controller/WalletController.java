@@ -43,6 +43,9 @@ public class WalletController {
 
     @GetMapping("/wallets/{wallet_id}")
     public ResponseEntity<?> getWallet(@PathVariable("wallet_id") String walletId) {
+        if (!stockService.walletExists(walletId)) {
+            return ResponseEntity.status(404).body(Map.of("error", "Wallet not found"));
+        }
         List<StockEntry> stocks = stockService.getWalletStocks(walletId);
         return ResponseEntity.ok(Map.of("id", walletId, "stocks", stocks));
     }

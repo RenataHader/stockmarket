@@ -36,9 +36,16 @@ No local Java installation needed — the build runs entirely inside Docker.
 docker compose up --build
 ```
 
-The API will be available at `http://localhost:8080`. Replace `8080` with any port you prefer.
+The API will be available at `http://localhost:8080` by default.
 
----
+To use a custom port:
+```bash
+# Linux / macOS
+PORT=9090 docker compose up --build
+
+# Windows
+$env:PORT=9090; docker compose up --build
+```
 
 ## Endpoints
 

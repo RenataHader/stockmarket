@@ -29,6 +29,10 @@ public class BankController {
         if (stocks == null) {
             return ResponseEntity.badRequest().body(Map.of("error", "Missing 'stocks' field"));
         }
+        boolean hasInvalid = stocks.stream().anyMatch(s -> s.quantity() < 0 || s.name() == null || s.name().isBlank());
+        if (hasInvalid) {
+            return ResponseEntity.badRequest().body(Map.of("error", "Stock name must not be blank and quantity must be >= 0"));
+        }
         stockService.setBankStocks(stocks);
         return ResponseEntity.ok().build();
     }

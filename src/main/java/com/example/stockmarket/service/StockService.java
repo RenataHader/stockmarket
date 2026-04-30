@@ -189,13 +189,19 @@ public class StockService {
                 .collect(Collectors.toList());
     }
 
+    public boolean walletExists(String walletId) {
+        String walletSet = WALLET_PREFIX + walletId + STOCKS_SET_SUFFIX;
+        Boolean exists = redis.hasKey(walletSet);
+        return Boolean.TRUE.equals(exists);
+    }
+
     public Optional<Long> getWalletStockQuantity(String walletId, String stockName) {
         if (!stockExists(stockName)) return Optional.empty();
+        if (!walletExists(walletId)) return Optional.empty();
         String key = WALLET_PREFIX + walletId + ":" + stockName;
         String val = redis.opsForValue().get(key);
         return Optional.of(val == null ? 0L : Long.parseLong(val));
     }
-
     public List<LogEntry> getLog() {
         List<String> raw = redis.opsForList().range(LOG_KEY, 0, -1);
         if (raw == null) return List.of();
